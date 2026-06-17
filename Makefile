@@ -1,4 +1,4 @@
-IMAGE   := lordraw77/plex-mcp
+IMAGE   := lordraw/plex-mcp
 VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
 .PHONY: all build push release test lint clean
