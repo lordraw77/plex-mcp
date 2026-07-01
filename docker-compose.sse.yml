@@ -1,0 +1,17 @@
+services:
+  plex-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lordraw77/plex-mcp:latest
+    env_file:
+      - .env
+    ports:
+      - "${MCP_PORT:-8000}:${MCP_PORT:-8000}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${MCP_PORT:-8000}/sse')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

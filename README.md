@@ -4,7 +4,7 @@ A comprehensive [Model Context Protocol (MCP)](https://modelcontextprotocol.io) 
 
 Exposes **38 tools** covering movies, TV shows, music, playlists, playback control, and library management — all accessible from any MCP-compatible AI client.
 
-**Transport:** stdio (JSON-RPC 2.0)  
+**Transport:** stdio (default) · SSE · streamable-http  
 **Protocol:** MCP 2024-11-05  
 **Auth:** credentials loaded from `.env` via python-dotenv
 
@@ -70,9 +70,14 @@ Sign in at plex.tv → open any media item → click the `···` menu → "Get 
 ### Run the MCP server
 
 ```bash
+# stdio (default — for Claude Desktop / MCP clients that spawn the process)
 uv run plex-mcp
-# or
-python -m plex_mcp.server
+
+# SSE — HTTP server on port 8000
+MCP_TRANSPORT=sse uv run plex-mcp
+
+# streamable-http — stateless HTTP on port 8000
+MCP_TRANSPORT=streamable-http uv run plex-mcp
 ```
 
 ---
@@ -81,7 +86,9 @@ python -m plex_mcp.server
 
 The image is published on Docker Hub: [`lordraw77/plex-mcp`](https://hub.docker.com/r/lordraw77/plex-mcp)
 
-### Pull and run
+### stdio transport (default)
+
+The server speaks JSON-RPC 2.0 over stdin/stdout. The `-i` flag is required to keep stdin open.
 
 ```bash
 docker run --rm -i \
@@ -90,9 +97,35 @@ docker run --rm -i \
   lordraw77/plex-mcp:latest
 ```
 
-The server communicates over **stdio** (JSON-RPC 2.0), so the `-i` flag is required to keep stdin open.
+### SSE transport (HTTP)
 
-### Use with Claude Desktop (Docker)
+Set `MCP_TRANSPORT=sse` to start an HTTP server. The SSE endpoint is exposed on port 8000.
+
+```bash
+docker run --rm \
+  -e PLEX_SERVER_URL=http://192.168.1.100:32400 \
+  -e PLEX_TOKEN=your_token_here \
+  -e MCP_TRANSPORT=sse \
+  -p 8000:8000 \
+  lordraw77/plex-mcp:latest
+```
+
+Connect your MCP client to `http://localhost:8000/sse`.
+
+### streamable-http transport
+
+```bash
+docker run --rm \
+  -e PLEX_SERVER_URL=http://192.168.1.100:32400 \
+  -e PLEX_TOKEN=your_token_here \
+  -e MCP_TRANSPORT=streamable-http \
+  -p 8000:8000 \
+  lordraw77/plex-mcp:latest
+```
+
+Connect your MCP client to `http://localhost:8000/mcp`.
+
+### Use with Claude Desktop (stdio via Docker)
 
 ```json
 {
@@ -110,14 +143,79 @@ The server communicates over **stdio** (JSON-RPC 2.0), so the `-i` flag is requi
 }
 ```
 
+### Use with Claude Desktop (SSE — long-running container)
+
+Start the container once:
+
+```bash
+docker run -d --name plex-mcp \
+  -e PLEX_SERVER_URL=http://192.168.1.100:32400 \
+  -e PLEX_TOKEN=your_token_here \
+  -e MCP_TRANSPORT=sse \
+  -p 8000:8000 \
+  lordraw77/plex-mcp:latest
+```
+
+Then add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "plex": {
+      "url": "http://localhost:8000/sse"
+    }
+  }
+}
+```
+
+### Docker Compose
+
+**stdio** (`docker-compose.stdio.yml`) — one-shot, used by MCP clients that spawn the process:
+
+```bash
+PLEX_SERVER_URL=http://192.168.1.100:32400 PLEX_TOKEN=your_token \
+  docker compose -f docker-compose.stdio.yml run --rm plex-mcp
+```
+
+**SSE** (`docker-compose.sse.yml`) — long-running HTTP server, starts automatically on reboot:
+
+```bash
+# copy and fill in your values
+cp .env.example .env
+
+docker compose -f docker-compose.sse.yml up -d
+```
+
+The SSE endpoint will be available at `http://localhost:8000/sse`.  
+Override the port: `MCP_PORT=9000 docker compose -f docker-compose.sse.yml up -d`
+
+To use `streamable-http` instead of `sse` with the same compose file:
+
+```bash
+MCP_TRANSPORT=streamable-http docker compose -f docker-compose.sse.yml up -d
+# endpoint: http://localhost:8000/mcp
+```
+
 ### Build locally
 
 ```bash
 make build          # build image
 make release        # build + push to Docker Hub
-make run            # run with env vars from shell
+make run            # stdio transport
+make run-sse        # SSE transport on port 8000
+make run-http       # streamable-http transport on port 8000
 make test           # run test suite
 ```
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `PLEX_SERVER_URL` | — | Base URL of your Plex server |
+| `PLEX_TOKEN` | — | Your Plex authentication token |
+| `MCP_TRANSPORT` | `stdio` | Transport: `stdio`, `sse`, or `streamable-http` |
+| `MCP_HOST` | `0.0.0.0` | Bind address (SSE / streamable-http only) |
+| `MCP_PORT` | `8000` | Bind port (SSE / streamable-http only) |
 
 ---
 

@@ -1,0 +1,10 @@
+services:
+  plex-mcp:
+    image: lordraw77/plex-mcp:latest
+    stdin_open: true
+    tty: false
+    environment:
+      PLEX_SERVER_URL: ${PLEX_SERVER_URL}
+      PLEX_TOKEN: ${PLEX_TOKEN}
+      MCP_TRANSPORT: stdio
+    restart: "no"

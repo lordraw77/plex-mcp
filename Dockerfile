@@ -19,4 +19,13 @@ RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+# Transport: stdio (default) | sse | streamable-http
+ENV MCP_TRANSPORT=stdio
+# SSE / streamable-http bind address and port
+ENV MCP_HOST=0.0.0.0
+ENV MCP_PORT=8000
+
+# Expose HTTP port (used only when MCP_TRANSPORT=sse or streamable-http)
+EXPOSE 8000
+
 ENTRYPOINT ["plex-mcp"]
